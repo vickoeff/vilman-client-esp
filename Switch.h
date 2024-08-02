@@ -9,7 +9,7 @@ class Switch {
     int lastSteadyState;
     bool onHold;
     unsigned long lastDebounceTime = 0;
-    unsigned long debounceDelay = 12;
+    unsigned long debounceDelay = 100;
     unsigned long holdTime = 400;
     unsigned long lastHoldTime = 0;
   public:

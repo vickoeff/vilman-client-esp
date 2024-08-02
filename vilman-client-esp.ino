@@ -34,12 +34,12 @@ const MapEntry doughFlavourMap[] = {
 
 const int mapSize = sizeof(doughFlavourMap) / sizeof(doughFlavourMap[0]);
 
+#define SUBMIT_BUTTON 16
 #define POP_FLAVOUR_BUTTON 0
-#define SUBMIT_BUTTON 3
-#define SWITCH_A 4
-#define SWITCH_B 5
-#define SWITCH_C 6
-#define SWITCH_D 7
+#define SWITCH_A 2
+#define SWITCH_B 12
+#define SWITCH_C 13
+#define SWITCH_D 14
 
 Switch SW_A(SWITCH_A);
 Switch SW_B(SWITCH_B);
@@ -48,9 +48,12 @@ Switch SW_D(SWITCH_D);
 Switch SW_POP(POP_FLAVOUR_BUTTON);
 Switch SW_SUBMIT(SUBMIT_BUTTON);
 
+byte decimal = 0;
+
 #define MAX_FLAVOUR 7 
 int flavourSize = 0;
 
+#define DEBOUNCE_BUTTON 300
 #define IDLE_TIMEOUT 15000// millisecond
 int timeoutCounter = 0;
 
@@ -106,7 +109,25 @@ void scrollText(int row, String message, int delayTime, int lcdColumns) {
     lcd.setCursor(0, row);
     lcd.print(message.substring(pos, pos + lcdColumns));
     delay(delayTime);
+    if(SW_A.isPressed() || SW_B.isPressed() || SW_C.isPressed() || SW_D.isPressed()) {
+      return;
+    }
   }
+}
+
+void checkButtonState() {
+  int bit0 = !SW_A.getState();
+  int bit1 = !SW_B.getState();
+  int bit2 = !SW_C.getState();
+  int bit3 = !SW_D.getState();
+  int pop = !SW_POP.getState();
+  
+  if (pop) {
+    popFlavour();
+    return;
+  }
+
+  decimal = (bit3 << 3) | (bit2 << 2) | (bit1 << 1) | bit0;
 }
 
 void updateMenu() {
@@ -126,24 +147,57 @@ void updateMenu() {
   }
 }
 
+void SELECT_FLAVOUR_STATE() {
+  timeoutCounter = 0;
+
+  while(timeoutCounter <= IDLE_TIMEOUT) {
+    checkButtonState();
+    Serial.print("Decimal: ");
+    Serial.println(decimal);
+    Serial.print("flavourSize: ");
+    Serial.println(flavourSize);
+    Serial.print("flavour: ");
+    for (int i = 0; i < flavourSize; i++) {
+      Serial.print(getValue(selectedFlavour[i]));
+      if (i < flavourSize - 1) {
+        Serial.print("|");
+      }
+    }
+    Serial.println("===========");
+    
+    // Set Dough or Flavour
+    if (decimal <= 4 && decimal > 0 && timeoutCounter > DEBOUNCE_BUTTON) {
+      selectedDough = decimal;
+      resetFlavour();
+      timeoutCounter = 0;
+      updateMenu();
+    } else if (decimal >= 4 && timeoutCounter > 300 && timeoutCounter > DEBOUNCE_BUTTON) {
+      addFlavour(decimal);
+      timeoutCounter = 0;
+      updateMenu();
+    } else {
+      // Idle Timeout Handler
+      if(timeoutCounter == IDLE_TIMEOUT) {
+        selectedDough = 0;
+        resetFlavour();
+      }
+      timeoutCounter += 10;
+      delay(10);
+    }
+  }
+}
+
 void setup(){
+  Serial.begin(115200);
+  Serial.println("Serial Begin");
   lcd.init();
   lcd.backlight();
 }
 
 void loop(){
-  int bit0 = !SW_A.getState();
-  int bit1 = !SW_B.getState();
-  int bit2 = !SW_C.getState();
-  int bit3 = !SW_D.getState();
-  int pop = !SW_POP.getState();
-
-  if (pop) {
-    popFlavour();
-    return;
-  }
-
-  byte decimal = (bit3 << 3) | (bit2 << 2) | (bit1 << 1) | bit0;
+    checkButtonState();
+    Serial.print("Decimal: ");
+    Serial.println(decimal);
 
   // Idle Condition
   if (selectedDough == 0 && decimal == 0) {
@@ -151,29 +205,8 @@ void loop(){
     lcd.setCursor(0, 0);
     lcd.print(messageStatic);
     scrollText(2, messageToScroll, 250, lcdColumns);
-    delay(1000);
     return;
-  } else if (decimal == 0) {
-    // Idle Timeout Handler
-    if(timeoutCounter == IDLE_TIMEOUT) {
-      selectedDough = 0;
-      resetFlavour();
-    }
-    timeoutCounter += 1000;
-    delay(1000);
-    return;
-  }
-
-  // Set Dough or Flavour
-  if (decimal <= 4) {
-    selectedDough = decimal;
-    resetFlavour();
-    timeoutCounter = 0;
   } else {
-    addFlavour(decimal);
-    timeoutCounter = 0;
+    SELECT_FLAVOUR_STATE();
   }
-
-  // Show selected menu
-  updateMenu();
 }
