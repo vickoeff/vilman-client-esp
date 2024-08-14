@@ -5,6 +5,8 @@
 #include <PubSubClient.h>
 #include "Switch.h"
 
+#include "pitches.h"
+
 int lcdColumns = 20;
 int lcdRows = 4;
 
@@ -51,6 +53,8 @@ const int mapSize = sizeof(doughFlavourMap) / sizeof(doughFlavourMap[0]);
 #define SW_COL_2 26
 #define SW_COL_3 27
 #define SUBMIT_BUTTON 33
+
+#define BUZZER_PIN 13
 
 // Define Default Switch key
 uint8_t sw_1_key = 1;
@@ -352,6 +356,11 @@ void resetFlavour() {
 };
 
 void updateKey(uint8_t key) {
+  if(key > 0) {
+    int noteDuration = 100;
+    tone(BUZZER_PIN, NOTE_E1, noteDuration);
+  }
+
   if(key == 17 && selectedDough > 0 && flavourSize > 0) {
     CREATE_TRANSACTION();
   }
