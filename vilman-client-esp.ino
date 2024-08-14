@@ -94,7 +94,8 @@ int iteration = 0;
 #define MAX_FLAVOUR 7 
 int flavourSize = 0;
 
-#define DEBOUNCE_BUTTON 300
+#define DEBOUNCE_BUTTON 500
+#define WAITING_BUTTON_SCROLL 300
 #define IDLE_TIMEOUT 20000// millisecond
 int timeoutCounter = 0;
 
@@ -151,29 +152,19 @@ WiFiClientSecure espClient;
 PubSubClient client(espClient);
 
 void callback(char* topic, byte* payload, unsigned int length) {
-  char* billText = "vilman/bill";
-  bool isBill = String(topic).equals(billText);
+  String message;
 
-  // Membuat buffer untuk menyimpan payload
-  char msg[length + 1];
-
-  // Mengkopi payload ke buffer
-  memcpy(msg, payload, length);
-
-  // Menambahkan null-terminator
-  msg[length] = '\0';
-
-  // Mengubah buffer menjadi string
-  String message = String(msg);
-
-  if (isBill) {
-    isBillReady = isBill;
-    billMessage = message;
+  for (int i = 0; i < length; i++) {
+    message.concat(((char)payload[i]));
   }
+
+  isBillReady = String(topic).equals("vilman/bill");
+  billMessage = message;
 
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
+  Serial.println(billMessage);
 }
 
 void handleRunningRow() {
@@ -318,7 +309,7 @@ uint8_t watchKeySwitch() {
 
   return 0;
 
-  delay(4); // 12 debounced delay / 3 column
+  delay(3); // 12 debounced delay / 4 column
 }
 
 const char* getValue(int id) {
@@ -354,6 +345,7 @@ void popFlavour() {
 
 void resetFlavour() {
   int temp = flavourSize;
+
   for (int i = 0; i < temp; i++) {
     selectedFlavour[--flavourSize];
   }
@@ -365,12 +357,15 @@ void updateKey(uint8_t key) {
   }
   
   // Set Dough or Flavour
-  if (key <= 4 && key > 0) {
+  if (key <= 4 && key > 0 && (timeoutCounter == 0 || timeoutCounter > DEBOUNCE_BUTTON)) {
+    timeoutCounter = 0;
     selectedDough = key;
+
     if (flavourSize > 0) {
       resetFlavour();
     }
-  } else if (key > 4 && key <= 16) {
+  } else if (key > 4 && key <= 16 && (timeoutCounter == 0 || timeoutCounter > DEBOUNCE_BUTTON)) {
+    timeoutCounter = 0;
     addFlavour(key);
   }
 }
@@ -397,7 +392,7 @@ void updateMenu() {
     lcd.setCursor(0, 3);
     lcd.print(flavours);
   } else {
-    scrollText(3, flavours, 250, lcdColumns);
+    scrollText(3, flavours, 100, lcdColumns);
   }
 }
 
@@ -420,8 +415,8 @@ void CREATE_TRANSACTION() {
     }
     
     lcd.clear();
-    lcd.setCursor(5, 1);
-    lcd.println("Membuat pesanan");
+    lcd.setCursor(2, 1);
+    lcd.print("Membuat pesanan");
     delay(500);
     Serial.println(payload);
     
@@ -430,21 +425,37 @@ void CREATE_TRANSACTION() {
 };
 
 void scrollText(int row, String message, int delayTime, int lcdColumns) {
-  for (int i=0; i < lcdColumns; i++) {
+  for (int i= 0; i < lcdColumns; i++) {
     message = " " + message;  
   }
   message = message + " "; 
+
+  uint8_t key = 0;
+
   for (int pos = 0; pos < message.length(); pos++) {
     lcd.setCursor(0, row);
     lcd.print(message.substring(pos, pos + lcdColumns));
-    uint8_t key = watchKeySwitch();
+    delay(delayTime);
+
+    int wait = 0;
+
+    while(wait <= WAITING_BUTTON_SCROLL) {
+      key = watchKeySwitch();
+
+      if(key > 0) {
+        updateMenu();
+        return;
+      }
+  
+      wait++;
+      delay(1);
+    }
+
     if(key > 0) {
       return;
     }
-    delay(delayTime);
   }
 }
-
 
 void SELECT_FLAVOUR_STATE() {
   timeoutCounter = 0;
@@ -454,23 +465,26 @@ void SELECT_FLAVOUR_STATE() {
     if (key > 0) {
       updateMenu();
     }
-    Serial.print("key: ");
-    Serial.println(key);
-    Serial.print("flavourSize: ");
-    Serial.println(flavourSize);
-    Serial.print("flavour: ");
-    for (int i = 0; i < flavourSize; i++) {
-      Serial.print(getValue(selectedFlavour[i]));
-      if (i < flavourSize - 1) {
-        Serial.print("|");
-      }
-    }
-    Serial.println("===========");
+    // Serial.print("key: ");
+    // Serial.println(key);
+    // Serial.print("flavourSize: ");
+    // Serial.println(flavourSize);
+    // Serial.print("flavour: ");
+    // for (int i = 0; i < flavourSize; i++) {
+    //   Serial.print(getValue(selectedFlavour[i]));
+    //   if (i < flavourSize - 1) {
+    //     Serial.print("|");
+    //   }
+    // }
+    // Serial.println("===========");
 
     // Idle Timeout Handler
     if(timeoutCounter == IDLE_TIMEOUT) {
       selectedDough = 0;
       resetFlavour();
+    }
+    if(selectedDough == 0 && flavourSize == 0) {
+      return;
     }
     timeoutCounter += 10;
     delay(10);
@@ -482,7 +496,7 @@ void WAITING_BILL() {
   
   lcd.clear();
   lcd.setCursor(0, 1);
-  lcd.println("Mohon ditunggu ^_^");
+  lcd.print("Mohon ditunggu ^_^");
 
   while(!isBillReady) {
     if (!client.connected()) {
@@ -507,11 +521,14 @@ void WAITING_BILL() {
     lcd.setCursor(0, 1);
     lcd.print("Total Harga:");
     lcd.setCursor(0, 2);
-    lcd.println(billMessage);
+    lcd.print("Rp ");
+    lcd.print(billMessage);
     
     delay(10000);
   }
-
+  
+  isBillReady = false;
+  billMessage = "";
   selectedDough = 0;
   resetFlavour();
 }
@@ -542,35 +559,37 @@ void setup_wifi() {
 
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.println("WiFi connected");
+  lcd.print("WiFi connected");
+  lcd.setCursor(0, 1);
   lcd.print("IP address: ");
-  lcd.println(WiFi.localIP());
+  lcd.print(WiFi.localIP());
   delay(300);
 }
 
 void reconnect() {
   while (!client.connected()) {
+    if(WiFi.status() != WL_CONNECTED) {
+      setup_wifi();
+    }
     Serial.print("Attempting MQTT connection...");
-    lcd.clear();      
-    lcd.println("Attempting MQTT connection...");
+    lcd.setCursor(19, 3);
+    lcd.print("-");
     
     String clientId = "ESP8266Client - vilman";
 
     if (client.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
       Serial.println("connected");
-      lcd.clear();   
-      lcd.println("connected to MQTT");
+      lcd.setCursor(19, 3);
+      lcd.print("#");
       // set subscribtion topic
       client.subscribe("vilman/bill");
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
-      
-      lcd.clear();      
-      lcd.print("failed, rc=");    
-      lcd.println(client.state());  
-      lcd.println(" try again in 5 seconds");
+
+      lcd.setCursor(19, 3);
+      lcd.print("!");
       delay(5000);
     }
   }
@@ -612,8 +631,7 @@ void loop(){
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print(messageStatic);
-    scrollText(2, messageToScroll, 250, lcdColumns);
-    return;
+    scrollText(2, messageToScroll, 100, lcdColumns);
   } else {
     updateMenu();
     SELECT_FLAVOUR_STATE();
