@@ -25,20 +25,28 @@ const MapEntry doughFlavourMap[] = {
   {3, "Pandan"},
   {4, "Black Forest"},
 // Flavour
-  {5, "Coklat"},
-  {6, "Coklat Crunch"},
-  {7, "Silver Queen"},
-  {8, "Kacang"},
-  {9, "Keju"},
-  {10, "Pisang"},
-  {11, "Spesial"},
-  {12, "Custom"},
+  {5, "Coklat"}, // Rp 3.000
+  {6, "Coklat Crunchy"}, // Rp 5.000
+  {7, "Kacang"}, // Rp 3.000
+  {8, "Silver Queen"}, // Rp 7.000
+  {9, "Keju"}, // Rp 5.000
+  {10, "Green Tea"}, // Rp 5.000
+  {11, "Tiramisu"}, // Rp 5.000
+  {12, "Custom"}, // Rp 1.000
   {13, ""},
   {14, ""},
   {15, ""},
 };
 
 const int mapSize = sizeof(doughFlavourMap) / sizeof(doughFlavourMap[0]);
+
+// Define Input char
+const char inputs[4][27] = {
+  {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '~', '~', '~', '~', '~', '~', '~', '~', '~', '~', '~', '~', '~', '~', '~', '~'},
+  {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '~'},
+  {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '~'},
+  {'!', '_', '=', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '+', '{', '}', '[', ']', ';', ':', '"', ',', '.', '<', '>', '?', '/'},
+};
 
 // Define keyboard scale
 #define X_KEY 4
@@ -112,8 +120,8 @@ int selectedFlavour[MAX_FLAVOUR];
 bool isBillReady = false;
 String billMessage;
 
-const char* ssid = "______";
-const char* password = "picilucu";
+char ssid[32];
+char password[32];
 const char* mqtt_server = "919a078e0d7f4c6a93566fc5f7320b0d.s1.eu.hivemq.cloud";
 
 const char* mqtt_username = "vilman-iot";
@@ -316,6 +324,103 @@ uint8_t watchKeySwitch() {
   delay(3); // 12 debounced delay / 4 column
 }
 
+uint8_t watchKeySwitch_Raw() {
+  handleRunningRow();
+
+  if(rowActv[0]) {
+    if(sw_1.isPressed()) {
+      Serial.println("pressed");
+      return sw_1.getKey();
+    }
+    
+    if(sw_2.isPressed()) {
+      Serial.println("pressed");
+      return sw_2.getKey();
+    } 
+
+    if(sw_3.isPressed()) {
+      Serial.println("pressed");
+      return sw_3.getKey();
+    }
+    
+    if(sw_4.isPressed()) {
+      Serial.println("pressed");
+      return sw_4.getKey();
+    }
+  } else if(rowActv[1]) {
+    if(sw_5.isPressed()) {
+      Serial.println("pressed");
+      return sw_5.getKey();
+    }
+
+    if(sw_6.isPressed()) {
+      Serial.println("pressed");
+      return sw_6.getKey();
+    }
+
+    if(sw_7.isPressed()) {
+      Serial.println("pressed");
+      return sw_7.getKey();
+    }
+    
+    if(sw_8.isPressed()) {
+      Serial.println("pressed");
+      return sw_8.getKey();
+    }
+  } else if(rowActv[2]) {
+    if(sw_9.isPressed()) {
+      Serial.println("pressed");
+      return sw_9.getKey();
+    }
+
+    if(sw_10.isPressed()) {
+      Serial.println("pressed");
+      return sw_10.getKey();
+    }
+
+    if(sw_11.isPressed()) {
+      Serial.println("pressed");
+      return sw_11.getKey();
+    }
+
+    if(sw_12.isPressed()) {
+      Serial.println("pressed");
+      return sw_12.getKey();
+    }
+  } else if(rowActv[3]) {
+    if(sw_13.isPressed()) {
+      Serial.println("pressed");
+      return sw_13.getKey();
+    }
+
+    if(sw_14.isPressed()) {
+      Serial.println("pressed");
+      return sw_14.getKey();
+    }
+
+    if(sw_15.isPressed()) {
+      Serial.println("pressed");
+      return sw_15.getKey();
+    }
+
+    if(sw_16.isPressed()) {
+      Serial.println("pressed");
+      return sw_16.getKey();
+    }
+  }
+
+  int submit = digitalRead(SUBMIT_BUTTON);
+
+  if(submit) {
+    updateKey(17);
+    return 17;
+  }
+
+  return 0;
+
+  delay(3); // 12 debounced delay / 4 column
+}
+
 const char* getValue(int id) {
   for (int i = 0; i < mapSize; i++) {
     if (doughFlavourMap[i].id == id) {
@@ -405,34 +510,6 @@ void updateMenu() {
   }
 }
 
-// STATES START =========================================
-void CREATE_TRANSACTION() {
-    if (!client.connected()) {
-      reconnect();
-    }
-    client.loop();
-
-    String payload = "";
-    payload.concat(String(selectedDough));
-    payload.concat("/");
-
-    for (int i = 0; i < flavourSize; i++) {
-      if(i > 0 && i < flavourSize) {
-        payload.concat(",");
-      }
-      payload.concat(String(selectedFlavour[i] - 4));
-    }
-    
-    lcd.clear();
-    lcd.setCursor(2, 1);
-    lcd.print("Membuat pesanan");
-    delay(500);
-    Serial.println(payload);
-    
-    client.publish("vilman/transaction", payload.c_str());
-    WAITING_BILL();
-};
-
 void scrollText(int row, String message, int delayTime, int lcdColumns) {
   for (int i= 0; i < lcdColumns; i++) {
     message = " " + message;  
@@ -466,6 +543,252 @@ void scrollText(int row, String message, int delayTime, int lcdColumns) {
   }
 }
 
+void updateWifiList(int n, int focusedWifi) {
+  Serial.print(n);
+  Serial.println("Select the network:");
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.println("Select the network:");
+  int k = 1;
+  // Show the wifi list
+  for(int i = focusedWifi; i < (3 + focusedWifi); i++) {
+    lcd.setCursor(0, k);
+
+    if(i == focusedWifi) {
+    lcd.print("> ");
+    }
+
+    if(i < n) {
+      Serial.printf(WiFi.SSID(i).c_str());
+      lcd.print(WiFi.SSID(i).c_str());
+      k++;
+    } else {
+      Serial.printf(WiFi.SSID(i - n).c_str());
+      lcd.print(WiFi.SSID(i).c_str());
+      k++;
+    }
+        
+    if(i == focusedWifi) {
+      lcd.print(" <");
+      }
+  }
+}
+
+void showCursor(int x, int y) {
+  lcd.setCursor(x, y);
+  lcd.print("_");
+}
+
+void updatePasswordLcd(char* pass) {
+  lcd.setCursor(0, 2);
+  String passString = pass;
+  lcd.print(pass);
+}
+
+// STATES START =========================================
+void SELECT_WIFI_SSID() {
+  int focusedWifi = 0;
+    
+  Serial.println("Scan Wifi");
+  lcd.clear();
+  lcd.setCursor(4, 1);
+  lcd.print("Scan Wifi");
+  delay(500);
+  // WiFi.scanNetworks will return the number of networks found.
+  int n = WiFi.scanNetworks();
+  Serial.println("Scan done");
+  lcd.clear();
+  lcd.setCursor(8, 1);
+  lcd.print("Scan done");
+  delay(500);
+
+  updateWifiList(n, focusedWifi);
+
+  while(ssid[0] == '\0') {
+    if (n == 0) {
+      lcd.clear();
+      lcd.setCursor(0, 1);
+      lcd.print("no networks found");
+      Serial.print("no networks found");
+      lcd.setCursor(0, 2);
+      lcd.print("rescan in 2 second");
+      delay(2000);
+      n = WiFi.scanNetworks();
+    } else {
+      uint8_t key = watchKeySwitch_Raw();
+
+      if (key == 1) {
+        if (focusedWifi == 0) {
+          focusedWifi = n - 1;
+        } else {
+          focusedWifi--;
+        }
+        
+        updateWifiList(n, focusedWifi);
+      }
+      if (key == 2) {
+        if (focusedWifi == n - 1) {
+          focusedWifi = 0;
+        } else {
+          focusedWifi++;
+        }
+        
+        updateWifiList(n, focusedWifi);
+      }
+
+      // Rescan Wifi
+      if (key == 5) {
+        break;
+      }
+      
+      // Select Wifi SSID
+      if (key == 17) {
+        // Get the SSID as a string and copy it to the ssid char array
+        String ssidString = WiFi.SSID(focusedWifi);
+        int length = ssidString.length();  // Correct parenthesis
+
+        // Copy the SSID string to the char array
+        strcpy(ssid, ssidString.c_str());
+        lcd.clear();
+        lcd.setCursor(0, 1);
+        lcd.print("Wifi Password Inputing");
+        break;
+      }
+
+      delay(50);
+    }
+  }
+}
+
+void INPUT_WIFI_PASSWORD() {
+  int cursorPos = 0;
+  char passWifi[32];
+  int inputMode = 0; // 0 number, 1 lower alphabet, 2 uppercase alphabet, 3 symbol
+  int selectPos = 0;
+  bool isBack = false;
+  
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Input Wifi Password:");
+  showCursor(cursorPos, 2);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    uint8_t key = watchKeySwitch_Raw();
+
+    // Change Input Mode
+    switch(key) {
+      case 5 :
+        selectPos = 0;
+        inputMode = 0;
+        break;
+      case 6:
+        selectPos = 0;
+        inputMode = 1;
+        break;
+      case 7:
+        selectPos = 0;
+        inputMode = 2;
+        break;
+      case 8:
+        selectPos = 0;
+        inputMode = 3;
+        break;
+    }
+
+    // Move The cursor and select the input
+    if (key == 1 && cursorPos > 0) {
+      cursorPos--;
+      selectPos = 0;
+      showCursor(cursorPos, 2);
+    }
+    if (key == 2 && cursorPos < lcdColumns) {
+      cursorPos++;
+      selectPos = 0;
+      showCursor(cursorPos, 2);
+    }
+    if (key == 3) {
+      if(inputMode == 0 && selectPos >= 9) {
+        selectPos = 0;
+      } else if ((inputMode == 1 || inputMode == 2) && selectPos >= 25) {
+        selectPos = 0;
+      } else {
+        selectPos++;
+      }
+      passWifi[cursorPos] = inputs[inputMode][selectPos];
+      updatePasswordLcd(passWifi);
+    }
+    if (key == 4) {
+      if(inputMode == 0 && selectPos == 0) {
+        selectPos = 9;
+      } else if ((inputMode == 1 || inputMode == 2) && selectPos == 0) {
+        selectPos = 25;
+      } else {
+        selectPos--;
+      }
+      passWifi[cursorPos] = inputs[inputMode][selectPos];
+      updatePasswordLcd(passWifi);
+    }
+
+    // Back to Select wifi
+    if (key == 12) {
+      isBack = true;
+      break;
+    }
+
+    // Submit Password
+    if (key == 17) {
+      strcpy(password, passWifi);
+
+      delay(10);
+      Serial.println();
+      Serial.print("Connecting to: ");
+      Serial.println(ssid);
+
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.println("Connecting to: ");
+      lcd.setCursor(0, 1);
+      lcd.print(ssid);
+
+      WiFi.begin(ssid, password);
+      break;
+    }
+    
+    delay(50);
+  }
+
+  if(isBack) {
+    SELECT_WIFI_SSID();
+  }
+}
+
+void CREATE_TRANSACTION() {
+    if (!client.connected()) {
+      reconnect();
+    }
+    client.loop();
+
+    String payload = "";
+    payload.concat(String(selectedDough));
+    payload.concat("/");
+
+    for (int i = 0; i < flavourSize; i++) {
+      if(i > 0 && i < flavourSize) {
+        payload.concat(",");
+      }
+      payload.concat(String(selectedFlavour[i] - 4));
+    }
+
+    lcd.clear();
+    lcd.setCursor(2, 1);
+    lcd.print("Membuat pesanan");
+    delay(500);
+    Serial.println(payload);
+
+    client.publish("vilman/transaction", payload.c_str());
+    WAITING_BILL();
+};
+
 void SELECT_FLAVOUR_STATE() {
   timeoutCounter = 0;
 
@@ -474,18 +797,6 @@ void SELECT_FLAVOUR_STATE() {
     if (key > 0) {
       updateMenu();
     }
-    // Serial.print("key: ");
-    // Serial.println(key);
-    // Serial.print("flavourSize: ");
-    // Serial.println(flavourSize);
-    // Serial.print("flavour: ");
-    // for (int i = 0; i < flavourSize; i++) {
-    //   Serial.print(getValue(selectedFlavour[i]));
-    //   if (i < flavourSize - 1) {
-    //     Serial.print("|");
-    //   }
-    // }
-    // Serial.println("===========");
 
     // Idle Timeout Handler
     if(timeoutCounter == IDLE_TIMEOUT) {
@@ -506,6 +817,8 @@ void WAITING_BILL() {
   lcd.clear();
   lcd.setCursor(0, 1);
   lcd.print("Mohon ditunggu ^_^");
+  lcd.setCursor(0, 2);
+  lcd.print("Untuk Total Harganya");
 
   while(!isBillReady) {
     if (!client.connected()) {
@@ -544,35 +857,44 @@ void WAITING_BILL() {
 // STATES END =========================================
 
 void setup_wifi() {
-  delay(10);
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-  
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.println("Connecting to ");
-  lcd.print(ssid);
+  if(ssid[0] == '\0' && WiFi.status() != WL_CONNECTED) {
+    Serial.print("SSID:");
+    Serial.println(String(ssid));
+    Serial.print("SSID Length: ");
+    Serial.println(strlen(ssid));
+    SELECT_WIFI_SSID();
+  } else if (ssid[0] != '\0' && password[0] == '\0' && WiFi.status() != WL_CONNECTED) {
+    INPUT_WIFI_PASSWORD();
+  } else if (password[0] != '\0' && ssid[0] != '\0')  {
+    delay(10);
+    Serial.println();
+    Serial.print("Connecting to: ");
+    Serial.println(ssid);
 
-  WiFi.begin(ssid, password);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Connecting to: ");
+      
+    lcd.setCursor(0, 1);
+    lcd.print(ssid);
 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+    WiFi.begin(ssid, password);
   }
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
 
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("WiFi connected");
-  lcd.setCursor(0, 1);
-  lcd.print("IP address: ");
-  lcd.print(WiFi.localIP());
-  delay(300);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("WiFi connected");
+    lcd.setCursor(0, 1);
+    lcd.print("IP address: ");
+    lcd.setCursor(0, 2);
+    lcd.print(WiFi.localIP());
+    delay(300);
+  }
 }
 
 void reconnect() {
@@ -617,6 +939,10 @@ void setup(){
   pinMode(SW_ROW_3, OUTPUT);
   pinMode(SUBMIT_BUTTON, INPUT);
 
+  // Set WiFi to station mode and disconnect from an AP if it was previously connected.
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
   setup_wifi();
 
   // Set the root CA
